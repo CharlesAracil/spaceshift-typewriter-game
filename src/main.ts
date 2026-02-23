@@ -343,10 +343,11 @@ function spawnRocket(): void {
   }
 
   const { wordTier, rocketSpeed } = getDifficulty();
+  const size = Math.random() < 0.5 ? 'small' : 'large';
 
   try {
     const word = getWord(wordTier);
-    rockets.push(new Rocket(x, y, word, canvas.width / 2, canvas.height / 2, rocketSpeed));
+    rockets.push(new Rocket(x, y, word, canvas.width / 2, canvas.height / 2, rocketSpeed, size));
   } catch {
     // Word pool exhausted — skip this spawn cycle
   }

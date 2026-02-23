@@ -6,6 +6,7 @@ export class Rocket {
   private vx: number;
   private vy: number;
   readonly word: string;
+  readonly size: 'small' | 'large';
   destroyed: boolean = false;
   isTargeted: boolean = false;
   typedCount: number = 0;
@@ -17,10 +18,12 @@ export class Rocket {
     targetX: number,
     targetY: number,
     speed: number,
+    size: 'small' | 'large' = 'small',
   ) {
     this.x = x;
     this.y = y;
     this.word = word;
+    this.size = size;
     const dx = targetX - x;
     const dy = targetY - y;
     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -48,10 +51,14 @@ export class Rocket {
 
   render(ctx: CanvasRenderingContext2D): void {
     const angle = Math.atan2(this.vy, this.vx);
+    // Small: uniform 70% scale. Large: 130% wide, 110% tall (squatter proportions).
+    const scaleX = this.size === 'small' ? 0.7 : 1.3;
+    const scaleY = this.size === 'small' ? 0.7 : 1.1;
 
     ctx.save();
     ctx.translate(Math.round(this.x), Math.round(this.y));
     ctx.rotate(angle);
+    ctx.scale(scaleX, scaleY);
     if (this.isTargeted) {
       // Yellow glow behind rocket body when targeted
       ctx.fillStyle = 'rgba(255, 230, 0, 0.45)';
@@ -65,7 +72,7 @@ export class Rocket {
   }
 
   private drawBody(ctx: CanvasRenderingContext2D): void {
-    // Flame (behind/left of rocket body)
+    // Flame (behind/left of rocket body) — same for both sizes
     ctx.fillStyle = '#ff8800';
     ctx.fillRect(-28, -8, 16, 16);
     ctx.fillStyle = '#ffcc00';
@@ -73,28 +80,51 @@ export class Rocket {
     ctx.fillStyle = '#ffffaa';
     ctx.fillRect(-22, -4, 6, 8);
 
-    // Fins (top and bottom)
-    ctx.fillStyle = '#881111';
-    ctx.fillRect(-20, -18, 12, 10); // top fin
-    ctx.fillRect(-20, 8, 12, 10);   // bottom fin
+    if (this.size === 'small') {
+      // Fins — cool dark blue
+      ctx.fillStyle = '#112266';
+      ctx.fillRect(-20, -18, 12, 10); // top fin
+      ctx.fillRect(-20, 8, 12, 10);   // bottom fin
 
-    // Main body
-    ctx.fillStyle = '#cc3333';
-    ctx.fillRect(-20, -8, 40, 16);
+      // Main body (blue/cyan)
+      ctx.fillStyle = '#2255cc';
+      ctx.fillRect(-20, -8, 40, 16);
 
-    // Top highlight stripe on body
-    ctx.fillStyle = '#ee5555';
-    ctx.fillRect(-20, -8, 40, 3);
+      // Top highlight stripe
+      ctx.fillStyle = '#4477ee';
+      ctx.fillRect(-20, -8, 40, 3);
 
-    // Nose cone (stepped/pixel style)
-    ctx.fillStyle = '#ee4444';
-    ctx.fillRect(20, -6, 10, 12);
-    ctx.fillStyle = '#ff6666';
-    ctx.fillRect(30, -4, 8, 8);
-    ctx.fillStyle = '#ffaaaa';
-    ctx.fillRect(38, -2, 4, 4);
+      // Nose cone — standard stepped/pixel style, blue tones
+      ctx.fillStyle = '#3366ee';
+      ctx.fillRect(20, -6, 10, 12);
+      ctx.fillStyle = '#5588ff';
+      ctx.fillRect(30, -4, 8, 8);
+      ctx.fillStyle = '#aabbff';
+      ctx.fillRect(38, -2, 4, 4);
+    } else {
+      // Large: deep red, taller/wider fins for stockier look
+      ctx.fillStyle = '#881111';
+      ctx.fillRect(-20, -20, 14, 12); // top fin — taller and wider
+      ctx.fillRect(-20, 8, 14, 12);   // bottom fin — taller and wider
 
-    // Porthole window
+      // Main body (deep red)
+      ctx.fillStyle = '#cc2222';
+      ctx.fillRect(-20, -8, 40, 16);
+
+      // Top highlight stripe
+      ctx.fillStyle = '#ee4444';
+      ctx.fillRect(-20, -8, 40, 3);
+
+      // Nose cone — shorter/stubbier for stocky look
+      ctx.fillStyle = '#ee3333';
+      ctx.fillRect(20, -6, 8, 12);  // shorter first step
+      ctx.fillStyle = '#ff5555';
+      ctx.fillRect(28, -4, 6, 8);
+      ctx.fillStyle = '#ffaaaa';
+      ctx.fillRect(34, -2, 4, 4);
+    }
+
+    // Porthole window — same for both sizes
     ctx.fillStyle = '#22ddff';
     ctx.fillRect(0, -6, 12, 12);
     ctx.fillStyle = '#88eeff';
@@ -107,7 +137,9 @@ export class Rocket {
     ctx.font = '8px "Press Start 2P", monospace';
 
     const labelX = Math.round(this.x);
-    const labelY = Math.round(this.y) - 28;
+    // Offset label vertically to clear the rocket body based on size
+    const labelOffset = this.size === 'small' ? 22 : 36;
+    const labelY = Math.round(this.y) - labelOffset;
     const totalWidth = Math.ceil(ctx.measureText(this.word).width);
     const startX = labelX - Math.round(totalWidth / 2);
 
