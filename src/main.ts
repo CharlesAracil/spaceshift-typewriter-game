@@ -211,6 +211,7 @@ function handleKeyDown(e: KeyboardEvent): void {
     }
 
     if (e.key === 'Backspace') {
+      e.preventDefault();
       typedBuffer = typedBuffer.slice(0, -1);
       updateTarget();
       return;
@@ -245,6 +246,7 @@ function handleKeyDown(e: KeyboardEvent): void {
     if (e.key === 'Enter') {
       submitName();
     } else if (e.key === 'Backspace') {
+      e.preventDefault();
       playerName = playerName.slice(0, -1);
     } else if (e.key.length === 1 && playerName.length < MAX_NAME_LENGTH) {
       playerName += e.key;
@@ -255,6 +257,10 @@ function handleKeyDown(e: KeyboardEvent): void {
     }
   }
 }
+
+window.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key === 'Backspace') e.preventDefault();
+}, { capture: true });
 
 window.addEventListener('keydown', handleKeyDown);
 
