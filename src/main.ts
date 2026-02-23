@@ -190,6 +190,14 @@ function handleKeyDown(e: KeyboardEvent): void {
   }
 
   if (gameState === 'playing') {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      typedBuffer = '';
+      targetedRocket = null;
+      updateTarget();
+      return;
+    }
+
     if (e.key === 'Backspace') {
       typedBuffer = typedBuffer.slice(0, -1);
       updateTarget();
