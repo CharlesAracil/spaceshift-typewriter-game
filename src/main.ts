@@ -643,20 +643,83 @@ function drawLeaderboard(): void {
 }
 
 function drawTypingHUD(): void {
-  const hudH = 40;
-  const hudY = canvas.height - hudH;
+  const panelW = Math.min(500, canvas.width * 0.6);
+  const panelH = 60;
+  const panelX = canvas.width / 2 - panelW / 2;
+  const panelY = canvas.height - panelH - 16;
+  const radius = 8;
+  const bracketLen = 12;
 
-  // Dark semi-transparent strip
-  ctx.fillStyle = 'rgba(0,0,0,0.75)';
-  ctx.fillRect(0, hudY, canvas.width, hudH);
-
-  // Prompt + typed text + static cursor
-  const display = `> ${typedBuffer}_`;
-  ctx.textAlign = 'left';
+  ctx.save();
   ctx.globalAlpha = 1;
+
+  // Dark semi-transparent background with rounded corners
+  ctx.fillStyle = 'rgba(2,10,20,0.88)';
+  ctx.beginPath();
+  ctx.roundRect(panelX, panelY, panelW, panelH, radius);
+  ctx.fill();
+
+  // Cyan border
+  ctx.strokeStyle = '#22ddff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(panelX, panelY, panelW, panelH, radius);
+  ctx.stroke();
+
+  // Gold corner accent brackets
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 2;
+  const bxl = panelX;
+  const byt = panelY;
+  const bxr = panelX + panelW;
+  const byb = panelY + panelH;
+
+  // Top-left
+  ctx.beginPath();
+  ctx.moveTo(bxl + bracketLen, byt);
+  ctx.lineTo(bxl, byt);
+  ctx.lineTo(bxl, byt + bracketLen);
+  ctx.stroke();
+
+  // Top-right
+  ctx.beginPath();
+  ctx.moveTo(bxr - bracketLen, byt);
+  ctx.lineTo(bxr, byt);
+  ctx.lineTo(bxr, byt + bracketLen);
+  ctx.stroke();
+
+  // Bottom-left
+  ctx.beginPath();
+  ctx.moveTo(bxl + bracketLen, byb);
+  ctx.lineTo(bxl, byb);
+  ctx.lineTo(bxl, byb - bracketLen);
+  ctx.stroke();
+
+  // Bottom-right
+  ctx.beginPath();
+  ctx.moveTo(bxr - bracketLen, byb);
+  ctx.lineTo(bxr, byb);
+  ctx.lineTo(bxr, byb - bracketLen);
+  ctx.stroke();
+
+  // 'INPUT' label above-left of panel
+  ctx.fillStyle = '#22ddff';
+  ctx.globalAlpha = 0.65;
+  ctx.font = `6px ${PX_FONT}`;
+  ctx.textAlign = 'left';
+  ctx.fillText('INPUT', panelX + 4, panelY - 4);
+  ctx.globalAlpha = 1;
+
+  // Typed text centered in panel with blinking cursor
+  const cursor = Math.floor(Date.now() / 500) % 2 === 0 ? '_' : ' ';
+  const display = typedBuffer.length > 0 ? typedBuffer + cursor : cursor;
   ctx.fillStyle = '#44ff88';
-  ctx.font = `10px ${PX_FONT}`;
-  ctx.fillText(display, 16, hudY + 26);
+  ctx.font = `12px ${PX_FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillText(display, canvas.width / 2, panelY + panelH / 2 + 5);
+
+  ctx.textAlign = 'left';
+  ctx.restore();
 }
 
 function drawPauseOverlay(): void {
