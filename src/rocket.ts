@@ -134,7 +134,7 @@ export class Rocket {
   }
 
   private drawLabel(ctx: CanvasRenderingContext2D): void {
-    ctx.font = '8px "Press Start 2P", monospace';
+    ctx.font = '11px "Press Start 2P", monospace';
 
     const labelX = Math.round(this.x);
     // Offset label vertically to clear the rocket body based on size
@@ -146,13 +146,13 @@ export class Rocket {
     // Background — highlighted border when targeted
     if (this.isTargeted) {
       ctx.fillStyle = 'rgba(255, 220, 0, 0.2)';
-      ctx.fillRect(startX - 4, labelY - 14, totalWidth + 8, 20);
+      ctx.fillRect(startX - 4, labelY - 17, totalWidth + 8, 23);
       ctx.strokeStyle = '#ffdd00';
       ctx.lineWidth = 2;
-      ctx.strokeRect(startX - 4, labelY - 14, totalWidth + 8, 20);
+      ctx.strokeRect(startX - 4, labelY - 17, totalWidth + 8, 23);
     } else {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-      ctx.fillRect(startX - 3, labelY - 13, totalWidth + 6, 18);
+      ctx.fillRect(startX - 3, labelY - 16, totalWidth + 6, 21);
     }
 
     // Word text: typed portion in green, remainder in white
