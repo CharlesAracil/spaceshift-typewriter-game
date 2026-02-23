@@ -62,7 +62,7 @@ const POINTS_PER_CHAR = 10;
 
 // ---- Game State ----
 
-type GameState = 'start' | 'playing' | 'entering-name' | 'leaderboard';
+type GameState = 'start' | 'playing' | 'paused' | 'entering-name' | 'leaderboard';
 let gameState: GameState = 'start';
 
 let playerName = '';
@@ -189,7 +189,19 @@ function handleKeyDown(e: KeyboardEvent): void {
     return;
   }
 
+  if (gameState === 'paused') {
+    if (e.key === 'Escape') {
+      gameState = 'playing';
+    }
+    return;
+  }
+
   if (gameState === 'playing') {
+    if (e.key === 'Escape') {
+      gameState = 'paused';
+      return;
+    }
+
     if (e.key === 'Enter') {
       e.preventDefault();
       typedBuffer = '';
@@ -610,6 +622,27 @@ function drawLeaderboard(): void {
   ctx.textAlign = 'left';
 }
 
+function drawPauseOverlay(): void {
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+
+  ctx.textAlign = 'center';
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `20px ${PX_FONT}`;
+  ctx.fillText('PAUSED', cx, cy - 10);
+
+  ctx.fillStyle = '#aaaacc';
+  ctx.font = `10px ${PX_FONT}`;
+  ctx.fillText('[ ESC to resume ]', cx, cy + 20);
+
+  ctx.textAlign = 'left';
+}
+
 const TIER_LABELS: Record<WordTier, string> = { short: 'EASY', medium: 'MEDIUM', long: 'HARD' };
 const TIER_COLORS: Record<WordTier, string> = { short: '#44ff88', medium: '#ffcc44', long: '#ff6644' };
 
@@ -660,6 +693,8 @@ function render(): void {
 
   if (gameState === 'start') {
     drawStartScreen();
+  } else if (gameState === 'paused') {
+    drawPauseOverlay();
   } else if (gameState === 'entering-name') {
     drawNameEntry();
   } else if (gameState === 'leaderboard') {
