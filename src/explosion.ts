@@ -1,0 +1,59 @@
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color: string;
+  life: number;
+  maxLife: number;
+}
+
+const PARTICLE_COLORS = [
+  '#ff4400', '#ff8800', '#ffcc00', '#ffff88', '#ffffff', '#ff2222',
+];
+
+export class Explosion {
+  private particles: Particle[] = [];
+
+  constructor(x: number, y: number) {
+    const count = 24;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+      const speed = 60 + Math.random() * 120;
+      const life = 400 + Math.random() * 300;
+      const colorIndex = Math.floor(Math.random() * PARTICLE_COLORS.length);
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        color: PARTICLE_COLORS[colorIndex] ?? '#ff8800',
+        life,
+        maxLife: life,
+      });
+    }
+  }
+
+  update(delta: number): void {
+    for (const p of this.particles) {
+      p.x += p.vx * (delta / 1000);
+      p.y += p.vy * (delta / 1000);
+      p.life -= delta;
+      p.vy += 40 * (delta / 1000); // gravity
+    }
+    this.particles = this.particles.filter(p => p.life > 0);
+  }
+
+  isDone(): boolean {
+    return this.particles.length === 0;
+  }
+
+  render(ctx: CanvasRenderingContext2D): void {
+    for (const p of this.particles) {
+      ctx.globalAlpha = p.life / p.maxLife;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x) - 2, Math.round(p.y) - 2, 4, 4);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
