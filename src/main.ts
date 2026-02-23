@@ -622,6 +622,23 @@ function drawLeaderboard(): void {
   ctx.textAlign = 'left';
 }
 
+function drawTypingHUD(): void {
+  const hudH = 40;
+  const hudY = canvas.height - hudH;
+
+  // Dark semi-transparent strip
+  ctx.fillStyle = 'rgba(0,0,0,0.75)';
+  ctx.fillRect(0, hudY, canvas.width, hudH);
+
+  // Prompt + typed text + static cursor
+  const display = `> ${typedBuffer}_`;
+  ctx.textAlign = 'left';
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#44ff88';
+  ctx.font = `10px ${PX_FONT}`;
+  ctx.fillText(display, 16, hudY + 26);
+}
+
 function drawPauseOverlay(): void {
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -699,6 +716,11 @@ function render(): void {
     drawNameEntry();
   } else if (gameState === 'leaderboard') {
     drawLeaderboard();
+  }
+
+  // Typing HUD drawn last so it's always on top
+  if (gameState === 'playing' || gameState === 'paused') {
+    drawTypingHUD();
   }
 }
 
