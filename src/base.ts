@@ -32,69 +32,181 @@ export class Base {
       this.drawDestroyedBase(ctx, cx, cy);
     }
 
-    // Hit flash: red overlay that fades out
+    // Hit flash: red circular overlay that fades out
     if (this.hitFlashTimer > 0) {
       const alpha = (this.hitFlashTimer / HIT_FLASH_DURATION_MS) * 0.6;
       ctx.fillStyle = `rgba(255,50,50,${alpha.toFixed(2)})`;
-      ctx.fillRect(cx - 36, cy - 56, 72, 82);
+      ctx.beginPath();
+      ctx.arc(cx, cy, 46, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     this.drawHealthBar(ctx, cx, cy);
   }
 
   private drawBase(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
-    // Main body
-    ctx.fillStyle = '#3355bb';
-    ctx.fillRect(cx - 30, cy - 20, 60, 50);
+    // Outer docking ring — thick dark-blue annulus
+    ctx.strokeStyle = '#1e3055';
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 42, 0, Math.PI * 2);
+    ctx.stroke();
 
-    // Tower
-    ctx.fillStyle = '#2244aa';
-    ctx.fillRect(cx - 14, cy - 44, 28, 28);
+    // Outer ring accent glow
+    ctx.strokeStyle = 'rgba(64, 196, 255, 0.45)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 42, 0, Math.PI * 2);
+    ctx.stroke();
 
-    // Battlements (pixel-art top)
-    ctx.fillStyle = '#4466cc';
-    ctx.fillRect(cx - 14, cy - 52, 8, 10);
-    ctx.fillRect(cx - 2, cy - 52, 8, 10);
-    ctx.fillRect(cx + 8, cy - 52, 8, 10);
+    // Ring connector spokes (4 cardinal points)
+    ctx.strokeStyle = '#2a4470';
+    ctx.lineWidth = 3;
+    for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+      const innerR = 28;
+      const outerR = 37;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * innerR, cy + Math.sin(angle) * innerR);
+      ctx.lineTo(cx + Math.cos(angle) * outerR, cy + Math.sin(angle) * outerR);
+      ctx.stroke();
+    }
 
-    // Window/aperture
-    ctx.fillStyle = '#ffcc44';
-    ctx.fillRect(cx - 6, cy - 38, 12, 10);
+    // Main hull — filled circle (primary body)
+    ctx.fillStyle = '#1e2d4a';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 28, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Door
-    ctx.fillStyle = '#111122';
-    ctx.fillRect(cx - 8, cy + 10, 16, 20);
+    // Hull surface gradient highlight
+    const grad = ctx.createRadialGradient(cx - 8, cy - 8, 2, cx, cy, 28);
+    grad.addColorStop(0, 'rgba(140, 200, 255, 0.30)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 28, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Pixel highlight (top-left edge)
-    ctx.fillStyle = '#6688ee';
-    ctx.fillRect(cx - 30, cy - 20, 2, 50);
-    ctx.fillRect(cx - 14, cy - 44, 2, 28);
+    // Hull edge rim
+    ctx.strokeStyle = '#3a5580';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 28, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Porthole window — left
+    ctx.fillStyle = '#0a1830';
+    ctx.beginPath();
+    ctx.arc(cx - 11, cy - 5, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(80, 220, 255, 0.75)';
+    ctx.beginPath();
+    ctx.arc(cx - 11, cy - 5, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // Porthole glint
+    ctx.fillStyle = 'rgba(200, 240, 255, 0.6)';
+    ctx.beginPath();
+    ctx.arc(cx - 12, cy - 7, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Porthole window — right
+    ctx.fillStyle = '#0a1830';
+    ctx.beginPath();
+    ctx.arc(cx + 11, cy - 5, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(80, 220, 255, 0.75)';
+    ctx.beginPath();
+    ctx.arc(cx + 11, cy - 5, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // Porthole glint
+    ctx.fillStyle = 'rgba(200, 240, 255, 0.6)';
+    ctx.beginPath();
+    ctx.arc(cx + 10, cy - 7, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Central reactor core
+    ctx.fillStyle = '#0d1f3a';
+    ctx.beginPath();
+    ctx.arc(cx, cy + 6, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(64, 255, 200, 0.65)';
+    ctx.beginPath();
+    ctx.arc(cx, cy + 6, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // Core pulse glow
+    ctx.strokeStyle = 'rgba(64, 255, 200, 0.25)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy + 6, 7, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   private drawDestroyedBase(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
-    // Rubble pile
-    ctx.fillStyle = '#444455';
-    ctx.fillRect(cx - 30, cy + 10, 60, 20);
+    // Shattered outer ring fragments
+    ctx.strokeStyle = '#2a3344';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 42, 0.3, 1.1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 42, 2.0, 2.9);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 42, 3.8, 4.7);
+    ctx.stroke();
 
-    // Broken walls
-    ctx.fillStyle = '#333344';
-    ctx.fillRect(cx - 28, cy - 10, 20, 22);
-    ctx.fillRect(cx + 10, cy - 5, 18, 17);
+    // Destroyed hull — dark cracked sphere
+    ctx.fillStyle = '#141e30';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 26, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#2a3040';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 26, 0, Math.PI * 2);
+    ctx.stroke();
 
-    // Charred / crumbled top
-    ctx.fillStyle = '#222233';
-    ctx.fillRect(cx - 12, cy - 18, 10, 12);
-    ctx.fillRect(cx + 4, cy - 14, 8, 9);
+    // Crack lines across hull
+    ctx.strokeStyle = '#0a1020';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, cy - 18);
+    ctx.lineTo(cx + 4, cy + 8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + 8, cy - 14);
+    ctx.lineTo(cx - 6, cy + 12);
+    ctx.stroke();
 
-    // Debris dots
-    ctx.fillStyle = '#555566';
-    ctx.fillRect(cx - 36, cy + 22, 4, 4);
-    ctx.fillRect(cx + 28, cy + 20, 6, 4);
-    ctx.fillRect(cx - 4, cy + 26, 4, 4);
+    // Dead porthole windows — dark
+    ctx.fillStyle = '#050d18';
+    ctx.beginPath();
+    ctx.arc(cx - 11, cy - 5, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#050d18';
+    ctx.beginPath();
+    ctx.arc(cx + 11, cy - 5, 5, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Flame-hint (orange tint at ruins)
-    ctx.fillStyle = 'rgba(255, 80, 0, 0.25)';
-    ctx.fillRect(cx - 14, cy - 10, 28, 24);
+    // Floating debris chunks around (cx, cy)
+    ctx.fillStyle = '#2a3344';
+    ctx.beginPath();
+    ctx.arc(cx - 32, cy + 10, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + 30, cy - 14, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + 8, cy + 36, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx - 18, cy + 32, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Flame / explosion glow remnant
+    ctx.fillStyle = 'rgba(255, 80, 0, 0.20)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private drawHealthBar(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
