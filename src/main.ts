@@ -1,5 +1,6 @@
 import { Base } from './base.ts';
 import { Explosion } from './explosion.ts';
+import { LaserBeam } from './laser.ts';
 import { Rocket } from './rocket.ts';
 import { getWordForSize, type WordTier } from './words.ts';
 
@@ -48,6 +49,7 @@ function drawBackground(): void {
 
 const base = new Base();
 const rockets: Rocket[] = [];
+const lasers: LaserBeam[] = [];
 const explosions: Explosion[] = [];
 
 const ROCKET_DAMAGE = 10; // HP lost per rocket impact
@@ -235,6 +237,7 @@ function handleKeyDown(e: KeyboardEvent): void {
     // Check if the typed buffer completes the targeted rocket's word
     if (targetedRocket !== null && targetedRocket.word === typedBuffer) {
       score += targetedRocket.word.length * POINTS_PER_CHAR;
+      lasers.push(new LaserBeam(canvas.width / 2, canvas.height / 2, targetedRocket.x, targetedRocket.y));
       explosions.push(new Explosion(targetedRocket.x, targetedRocket.y));
       targetedRocket.destroy();
       const idx = rockets.indexOf(targetedRocket);
@@ -284,6 +287,7 @@ function resetGame(): void {
     r.destroy();
   }
   rockets.length = 0;
+  lasers.length = 0;
   explosions.length = 0;
   base.reset();
   spawnTimer = 0;
@@ -406,6 +410,14 @@ function update(delta: number): void {
     targetedRocket = null;
     typedBuffer = '';
     updateTarget();
+  }
+
+  // Update lasers
+  for (const laser of lasers) {
+    laser.update(delta);
+  }
+  for (let i = lasers.length - 1; i >= 0; i--) {
+    if (lasers[i].isDone()) lasers.splice(i, 1);
   }
 
   // Update explosions
@@ -705,6 +717,10 @@ function render(): void {
   drawBackground();
 
   base.render(ctx, canvas);
+
+  for (const laser of lasers) {
+    laser.render(ctx);
+  }
 
   for (const rocket of rockets) {
     rocket.render(ctx);
