@@ -1,7 +1,7 @@
 import { Base } from './base.ts';
 import { Explosion } from './explosion.ts';
 import { Rocket } from './rocket.ts';
-import { getWord, type WordTier } from './words.ts';
+import { getWordForSize, type WordTier } from './words.ts';
 
 // Pixel-art font used throughout
 const PX_FONT = '"Press Start 2P", monospace';
@@ -342,11 +342,12 @@ function spawnRocket(): void {
       break;
   }
 
-  const { wordTier, rocketSpeed } = getDifficulty();
-  const size = Math.random() < 0.5 ? 'small' : 'large';
+  const { rocketSpeed } = getDifficulty();
+  // 60% small / 40% large spawn ratio
+  const size = Math.random() < 0.6 ? 'small' : 'large';
 
   try {
-    const word = getWord(wordTier);
+    const word = getWordForSize(size);
     rockets.push(new Rocket(x, y, word, canvas.width / 2, canvas.height / 2, rocketSpeed, size));
   } catch {
     // Word pool exhausted — skip this spawn cycle

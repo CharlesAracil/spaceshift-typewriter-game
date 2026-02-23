@@ -327,6 +327,12 @@ const WORD_TIERS: Record<WordTier, string[]> = {
   long: LONG_WORDS,
 };
 
+// Size-based word pools:
+// Small enemies get words ≤5 chars; 6-char words included so they can go to either size.
+// Large enemies get words ≥7 chars; 6-char words included so they can go to either size.
+const SMALL_WORD_POOL: string[] = [...SHORT_WORDS, ...MEDIUM_WORDS].filter(w => w.length <= 6);
+const LARGE_WORD_POOL: string[] = [...MEDIUM_WORDS, ...LONG_WORDS].filter(w => w.length >= 6);
+
 // Set of words currently assigned to active rockets
 const activeWords = new Set<string>();
 
@@ -339,6 +345,23 @@ export function getWord(tier: WordTier): string {
   const available = pool.filter((w) => !activeWords.has(w));
   if (available.length === 0) {
     throw new Error(`No available words in tier "${tier}"`);
+  }
+  const word = available[Math.floor(Math.random() * available.length)];
+  activeWords.add(word);
+  return word;
+}
+
+/**
+ * Returns a random word appropriate for the given enemy size.
+ * Small enemies: words ≤5 chars (6-char words included so they can randomly land on either size).
+ * Large enemies: words ≥7 chars (6-char words included so they can randomly land on either size).
+ * Throws if the pool for the given size is exhausted.
+ */
+export function getWordForSize(size: 'small' | 'large'): string {
+  const pool = size === 'small' ? SMALL_WORD_POOL : LARGE_WORD_POOL;
+  const available = pool.filter(w => !activeWords.has(w));
+  if (available.length === 0) {
+    throw new Error(`No available words for size "${size}"`);
   }
   const word = available[Math.floor(Math.random() * available.length)];
   activeWords.add(word);
