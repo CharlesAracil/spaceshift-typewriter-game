@@ -317,9 +317,19 @@ function resetGame(): void {
 let playAgainBtn = { x: 0, y: 0, w: 0, h: 0 };
 
 // Pause overlay control bounds (updated each frame during drawPauseOverlay)
-let muteBtn = { x: 0, y: 0, w: 0, h: 0 };
-let volumeSlider = { x: 0, y: 0, w: 0, h: 0 };
-let isDraggingVolume = false;
+let musicMuteBtn = { x: 0, y: 0, w: 0, h: 0 };
+let musicSlider  = { x: 0, y: 0, w: 0, h: 0 };
+let sfxMuteBtn   = { x: 0, y: 0, w: 0, h: 0 };
+let sfxSlider    = { x: 0, y: 0, w: 0, h: 0 };
+let activeSlider: 'music' | 'sfx' | null = null;
+
+// FPS counter
+const FPS_STORAGE_KEY = 'rocket-typing-show-fps';
+let showFps: boolean = localStorage.getItem(FPS_STORAGE_KEY) === 'true';
+let fpsDisplay = 0;
+let fpsSampleTime = 0;
+let fpsFrameCount = 0;
+let fpsBtnBounds = { x: 0, y: 0, w: 0, h: 0 };
 
 canvas.addEventListener('click', (e: MouseEvent) => {
   const rect = canvas.getBoundingClientRect();
@@ -327,14 +337,15 @@ canvas.addEventListener('click', (e: MouseEvent) => {
   const my = e.clientY - rect.top;
 
   if (gameState === 'paused') {
-    if (
-      !isDraggingVolume &&
-      mx >= muteBtn.x &&
-      mx <= muteBtn.x + muteBtn.w &&
-      my >= muteBtn.y &&
-      my <= muteBtn.y + muteBtn.h
-    ) {
-      audio.muted = !audio.muted;
+    if (activeSlider === null) {
+      if (hitTest(mx, my, musicMuteBtn)) {
+        audio.musicMuted = !audio.musicMuted;
+      } else if (hitTest(mx, my, sfxMuteBtn)) {
+        audio.sfxMuted = !audio.sfxMuted;
+      } else if (hitTest(mx, my, fpsBtnBounds)) {
+        showFps = !showFps;
+        localStorage.setItem(FPS_STORAGE_KEY, showFps ? 'true' : 'false');
+      }
     }
     return;
   }
@@ -352,9 +363,16 @@ canvas.addEventListener('click', (e: MouseEvent) => {
 
 // ---- Volume slider drag ----
 
-function applyVolumeFromMouseX(mx: number): void {
-  const t = Math.max(0, Math.min(1, (mx - volumeSlider.x) / volumeSlider.w));
-  audio.volume = t;
+function hitTest(mx: number, my: number, r: { x: number; y: number; w: number; h: number }): boolean {
+  return mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h;
+}
+
+function applyMusicVolumeFromMouseX(mx: number): void {
+  audio.musicVolume = Math.max(0, Math.min(1, (mx - musicSlider.x) / musicSlider.w));
+}
+
+function applySfxVolumeFromMouseX(mx: number): void {
+  audio.sfxVolume = Math.max(0, Math.min(1, (mx - sfxSlider.x) / sfxSlider.w));
 }
 
 canvas.addEventListener('mousedown', (e: MouseEvent) => {
@@ -362,26 +380,28 @@ canvas.addEventListener('mousedown', (e: MouseEvent) => {
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
-  if (
-    mx >= volumeSlider.x &&
-    mx <= volumeSlider.x + volumeSlider.w &&
-    my >= volumeSlider.y &&
-    my <= volumeSlider.y + volumeSlider.h
-  ) {
-    isDraggingVolume = true;
-    applyVolumeFromMouseX(mx);
+  if (hitTest(mx, my, musicSlider)) {
+    activeSlider = 'music';
+    applyMusicVolumeFromMouseX(mx);
+  } else if (hitTest(mx, my, sfxSlider)) {
+    activeSlider = 'sfx';
+    applySfxVolumeFromMouseX(mx);
   }
 });
 
 window.addEventListener('mousemove', (e: MouseEvent) => {
-  if (!isDraggingVolume) return;
+  if (activeSlider === null) return;
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
-  applyVolumeFromMouseX(mx);
+  if (activeSlider === 'music') {
+    applyMusicVolumeFromMouseX(mx);
+  } else {
+    applySfxVolumeFromMouseX(mx);
+  }
 });
 
 window.addEventListener('mouseup', () => {
-  isDraggingVolume = false;
+  activeSlider = null;
 });
 
 // ---- Spawning ----
@@ -788,6 +808,57 @@ function drawTypingHUD(): void {
   ctx.restore();
 }
 
+interface BoundsRect { x: number; y: number; w: number; h: number; }
+
+function drawAudioRow(opts: {
+  label: string; labelY: number; btnY: number; sliderY: number;
+  cx: number; btnW: number; btnH: number; sliderW: number; sliderH: number;
+  muted: boolean; volume: number;
+  btnRef: BoundsRect; sliderRef: BoundsRect;
+}): void {
+  const { label, labelY, btnY, sliderY, cx, btnW, btnH, sliderW, sliderH, muted, volume } = opts;
+  const btnX = cx - btnW / 2;
+  const sliderX = cx - sliderW / 2;
+
+  // Section label
+  ctx.fillStyle = '#8888bb';
+  ctx.font = `8px ${PX_FONT}`;
+  ctx.fillText(label, cx, labelY);
+
+  // Toggle button
+  opts.btnRef.x = btnX; opts.btnRef.y = btnY; opts.btnRef.w = btnW; opts.btnRef.h = btnH;
+  ctx.fillStyle = 'rgba(5,5,15,0.9)';
+  ctx.fillRect(btnX, btnY, btnW, btnH);
+  ctx.strokeStyle = '#22ddff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(btnX, btnY, btnW, btnH);
+  ctx.fillStyle = muted ? '#ff4444' : '#44ff88';
+  ctx.font = `10px ${PX_FONT}`;
+  ctx.fillText(muted ? 'OFF' : 'ON', cx, btnY + btnH / 2 + 4);
+
+  // Slider track
+  opts.sliderRef.x = sliderX; opts.sliderRef.y = sliderY; opts.sliderRef.w = sliderW; opts.sliderRef.h = sliderH;
+  ctx.fillStyle = 'rgba(5,5,15,0.9)';
+  ctx.fillRect(sliderX, sliderY, sliderW, sliderH);
+  ctx.strokeStyle = '#22ddff';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(sliderX, sliderY, sliderW, sliderH);
+
+  // Volume fill
+  const fillW = sliderW * volume;
+  ctx.fillStyle = muted ? '#334455' : '#22ddff';
+  ctx.fillRect(sliderX, sliderY, fillW, sliderH);
+
+  // Thumb indicator
+  const thumbX = sliderX + fillW;
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(thumbX, sliderY - 3);
+  ctx.lineTo(thumbX, sliderY + sliderH + 3);
+  ctx.stroke();
+}
+
 function drawPauseOverlay(): void {
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -800,60 +871,57 @@ function drawPauseOverlay(): void {
 
   ctx.fillStyle = '#ffffff';
   ctx.font = `20px ${PX_FONT}`;
-  ctx.fillText('PAUSED', cx, cy - 10);
+  ctx.fillText('PAUSED', cx, cy - 52);
 
   ctx.fillStyle = '#aaaacc';
   ctx.font = `10px ${PX_FONT}`;
-  ctx.fillText('[ ESC to resume ]', cx, cy + 20);
+  ctx.fillText('[ ESC to resume ]', cx, cy - 24);
 
-  // Mute toggle button
   const btnW = 200;
-  const btnH = 36;
-  const btnX = cx - btnW / 2;
-  const btnY = cy + 48;
-  muteBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
-
-  ctx.fillStyle = 'rgba(5,5,15,0.9)';
-  ctx.fillRect(btnX, btnY, btnW, btnH);
-  ctx.strokeStyle = '#22ddff';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(btnX, btnY, btnW, btnH);
-
-  ctx.fillStyle = audio.muted ? '#ff4444' : '#44ff88';
-  ctx.font = `10px ${PX_FONT}`;
-  ctx.fillText(audio.muted ? 'SOUND: OFF' : 'SOUND: ON', cx, btnY + 24);
-
-  // Volume label
-  ctx.fillStyle = '#8888bb';
-  ctx.font = `8px ${PX_FONT}`;
-  ctx.fillText('VOLUME', cx, cy + 102);
-
-  // Volume slider track
+  const btnH = 30;
   const sliderW = 240;
-  const sliderH = 16;
-  const sliderX = cx - sliderW / 2;
-  const sliderY = cy + 112;
-  volumeSlider = { x: sliderX, y: sliderY, w: sliderW, h: sliderH };
+  const sliderH = 14;
 
-  ctx.fillStyle = 'rgba(5,5,15,0.9)';
-  ctx.fillRect(sliderX, sliderY, sliderW, sliderH);
-  ctx.strokeStyle = '#22ddff';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(sliderX, sliderY, sliderW, sliderH);
+  // Music row
+  drawAudioRow({
+    label: 'MUSIC', labelY: cy + 6, btnY: cy + 16, sliderY: cy + 52,
+    cx, btnW, btnH, sliderW, sliderH,
+    muted: audio.musicMuted, volume: audio.musicVolume,
+    btnRef: musicMuteBtn, sliderRef: musicSlider,
+  });
 
-  // Volume fill
-  const fillW = sliderW * audio.volume;
-  ctx.fillStyle = audio.muted ? '#334455' : '#22ddff';
-  ctx.fillRect(sliderX, sliderY, fillW, sliderH);
+  // SFX row
+  drawAudioRow({
+    label: 'SFX', labelY: cy + 74, btnY: cy + 84, sliderY: cy + 120,
+    cx, btnW, btnH, sliderW, sliderH,
+    muted: audio.sfxMuted, volume: audio.sfxVolume,
+    btnRef: sfxMuteBtn, sliderRef: sfxSlider,
+  });
 
-  // Thumb indicator
-  const thumbX = sliderX + fillW;
-  ctx.strokeStyle = '#ffd700';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(thumbX, sliderY - 3);
-  ctx.lineTo(thumbX, sliderY + sliderH + 3);
-  ctx.stroke();
+  // FPS toggle button
+  const fpsBtnW = 200;
+  const fpsBtnH = 30;
+  const fpsBtnX = cx - fpsBtnW / 2;
+  const fpsBtnY = cy + 154;
+  fpsBtnBounds.x = fpsBtnX;
+  fpsBtnBounds.y = fpsBtnY;
+  fpsBtnBounds.w = fpsBtnW;
+  fpsBtnBounds.h = fpsBtnH;
+
+  ctx.fillStyle = '#111133';
+  ctx.strokeStyle = '#4444aa';
+  ctx.lineWidth = 1;
+  ctx.fillRect(fpsBtnX, fpsBtnY, fpsBtnW, fpsBtnH);
+  ctx.strokeRect(fpsBtnX, fpsBtnY, fpsBtnW, fpsBtnH);
+
+  ctx.font = `7px ${PX_FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#aaaacc';
+  ctx.fillText('FPS COUNTER', cx, fpsBtnY + 12);
+
+  const fpsStatus = showFps ? 'ON' : 'OFF';
+  ctx.fillStyle = showFps ? '#44ff88' : '#ff6644';
+  ctx.fillText(fpsStatus, cx, fpsBtnY + 24);
 
   ctx.textAlign = 'left';
 }
@@ -920,6 +988,25 @@ function render(): void {
     drawLeaderboard();
   }
 
+  // FPS counter (top-right, always on top when enabled)
+  if (showFps) {
+    const fpsText = `${fpsDisplay} FPS`;
+    ctx.font = `7px ${PX_FONT}`;
+    const fpsW = ctx.measureText(fpsText).width;
+    const fpsPadX = 8;
+    const fpsPadY = 6;
+    const fpsBgW = fpsW + fpsPadX * 2;
+    const fpsBgH = 18;
+    const fpsBgX = canvas.width - fpsBgW - 8;
+    const fpsBgY = 8;
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(fpsBgX, fpsBgY, fpsBgW, fpsBgH);
+    ctx.fillStyle = fpsDisplay >= 50 ? '#44ff88' : fpsDisplay >= 30 ? '#ffcc44' : '#ff6644';
+    ctx.textAlign = 'right';
+    ctx.fillText(fpsText, canvas.width - 8 - fpsPadX, fpsBgY + fpsBgH - fpsPadY);
+    ctx.textAlign = 'left';
+  }
+
   // Typing HUD drawn last so it's always on top
   if (gameState === 'playing' || gameState === 'paused') {
     drawTypingHUD();
@@ -929,6 +1016,15 @@ function render(): void {
 function gameLoop(timestamp: number): void {
   const delta = timestamp - lastTime;
   lastTime = timestamp;
+
+  // FPS sampling: average over 500 ms
+  fpsFrameCount++;
+  fpsSampleTime += delta;
+  if (fpsSampleTime >= 500) {
+    fpsDisplay = Math.round(fpsFrameCount * 1000 / fpsSampleTime);
+    fpsFrameCount = 0;
+    fpsSampleTime = 0;
+  }
 
   update(delta);
   render();
