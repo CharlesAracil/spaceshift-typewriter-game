@@ -810,22 +810,33 @@ function drawTypingHUD(): void {
 
 interface BoundsRect { x: number; y: number; w: number; h: number; }
 
+// Draws a horizontal audio row: LABEL  [ON/OFF]  [=========|===]
+// rowY is the vertical center of the row
 function drawAudioRow(opts: {
-  label: string; labelY: number; btnY: number; sliderY: number;
-  cx: number; btnW: number; btnH: number; sliderW: number; sliderH: number;
+  label: string; rowY: number;
+  rowLeft: number; rowRight: number;
+  btnW: number; btnH: number; sliderH: number;
   muted: boolean; volume: number;
   btnRef: BoundsRect; sliderRef: BoundsRect;
 }): void {
-  const { label, labelY, btnY, sliderY, cx, btnW, btnH, sliderW, sliderH, muted, volume } = opts;
-  const btnX = cx - btnW / 2;
-  const sliderX = cx - sliderW / 2;
+  const { label, rowY, rowLeft, rowRight, btnW, btnH, sliderH, muted, volume } = opts;
+  const labelW = 52;
+  const gap = 12;
+  const availableW = rowRight - rowLeft - labelW - gap - btnW - gap;
+  const sliderW = Math.max(availableW, 60);
 
-  // Section label
-  ctx.fillStyle = '#8888bb';
-  ctx.font = `8px ${PX_FONT}`;
-  ctx.fillText(label, cx, labelY);
+  const labelX = rowLeft + labelW / 2;
+  const btnX = rowLeft + labelW + gap;
+  const sliderX = btnX + btnW + gap;
+
+  // Label
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#8899bb';
+  ctx.font = `9px ${PX_FONT}`;
+  ctx.fillText(label, labelX, rowY + 4);
 
   // Toggle button
+  const btnY = rowY - btnH / 2;
   opts.btnRef.x = btnX; opts.btnRef.y = btnY; opts.btnRef.w = btnW; opts.btnRef.h = btnH;
   ctx.fillStyle = 'rgba(5,5,15,0.9)';
   ctx.fillRect(btnX, btnY, btnW, btnH);
@@ -834,9 +845,10 @@ function drawAudioRow(opts: {
   ctx.strokeRect(btnX, btnY, btnW, btnH);
   ctx.fillStyle = muted ? '#ff4444' : '#44ff88';
   ctx.font = `10px ${PX_FONT}`;
-  ctx.fillText(muted ? 'OFF' : 'ON', cx, btnY + btnH / 2 + 4);
+  ctx.fillText(muted ? 'OFF' : 'ON', btnX + btnW / 2, rowY + 4);
 
   // Slider track
+  const sliderY = rowY - sliderH / 2;
   opts.sliderRef.x = sliderX; opts.sliderRef.y = sliderY; opts.sliderRef.w = sliderW; opts.sliderRef.h = sliderH;
   ctx.fillStyle = 'rgba(5,5,15,0.9)';
   ctx.fillRect(sliderX, sliderY, sliderW, sliderH);
@@ -846,7 +858,7 @@ function drawAudioRow(opts: {
 
   // Volume fill
   const fillW = sliderW * volume;
-  ctx.fillStyle = muted ? '#334455' : '#22ddff';
+  ctx.fillStyle = muted ? '#1a2a33' : '#22ddff';
   ctx.fillRect(sliderX, sliderY, fillW, sliderH);
 
   // Thumb indicator
@@ -860,68 +872,112 @@ function drawAudioRow(opts: {
 }
 
 function drawPauseOverlay(): void {
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
 
+  // Layout constants
+  const panelW = 340;
+  const padding = 20;
+  const rowH = 32;           // height of each audio row
+  const rowGap = 14;         // gap between the two audio rows
+  const btnW = 52;
+  const btnH = 24;
+  const sliderH = 12;
+  const fpsBtnW = panelW - padding * 2;
+  const fpsBtnH = 26;
+  const headerH = 64;        // title + subtitle
+  const footerH = fpsBtnH + 24;
+
+  const panelH = headerH + rowH + rowGap + rowH + rowGap + footerH + padding;
+  const panelX = cx - panelW / 2;
+  const panelY = cy - panelH / 2;
+  const rowLeft = panelX + padding;
+  const rowRight = panelX + panelW - padding;
+
+  // Panel background
+  ctx.fillStyle = 'rgba(4,4,20,0.92)';
+  ctx.fillRect(panelX, panelY, panelW, panelH);
+  ctx.strokeStyle = '#22ddff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(panelX, panelY, panelW, panelH);
+
   ctx.textAlign = 'center';
   ctx.globalAlpha = 1;
 
+  // Title
   ctx.fillStyle = '#ffffff';
-  ctx.font = `20px ${PX_FONT}`;
-  ctx.fillText('PAUSED', cx, cy - 52);
+  ctx.font = `22px ${PX_FONT}`;
+  ctx.fillText('PAUSED', cx, panelY + 30);
 
-  ctx.fillStyle = '#aaaacc';
-  ctx.font = `10px ${PX_FONT}`;
-  ctx.fillText('[ ESC to resume ]', cx, cy - 24);
+  // Subtitle
+  ctx.fillStyle = '#7788aa';
+  ctx.font = `9px ${PX_FONT}`;
+  ctx.fillText('ESC  TO  RESUME', cx, panelY + 50);
 
-  const btnW = 200;
-  const btnH = 30;
-  const sliderW = 240;
-  const sliderH = 14;
+  // Divider under header
+  const dividerY = panelY + headerH;
+  ctx.strokeStyle = 'rgba(34,221,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(panelX + padding, dividerY);
+  ctx.lineTo(panelX + panelW - padding, dividerY);
+  ctx.stroke();
 
-  // Music row
+  // Audio rows — vertically centered within their slot
+  const row1Y = dividerY + rowGap + rowH / 2;
+  const row2Y = row1Y + rowH + rowGap;
+
   drawAudioRow({
-    label: 'MUSIC', labelY: cy + 6, btnY: cy + 16, sliderY: cy + 52,
-    cx, btnW, btnH, sliderW, sliderH,
+    label: 'MUSIC', rowY: row1Y, rowLeft, rowRight,
+    btnW, btnH, sliderH,
     muted: audio.musicMuted, volume: audio.musicVolume,
     btnRef: musicMuteBtn, sliderRef: musicSlider,
   });
 
-  // SFX row
   drawAudioRow({
-    label: 'SFX', labelY: cy + 74, btnY: cy + 84, sliderY: cy + 120,
-    cx, btnW, btnH, sliderW, sliderH,
+    label: 'SFX', rowY: row2Y, rowLeft, rowRight,
+    btnW, btnH, sliderH,
     muted: audio.sfxMuted, volume: audio.sfxVolume,
     btnRef: sfxMuteBtn, sliderRef: sfxSlider,
   });
 
+  // Divider before footer
+  const footerDividerY = row2Y + rowH / 2 + rowGap;
+  ctx.strokeStyle = 'rgba(34,221,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(panelX + padding, footerDividerY);
+  ctx.lineTo(panelX + panelW - padding, footerDividerY);
+  ctx.stroke();
+
   // FPS toggle button
-  const fpsBtnW = 200;
-  const fpsBtnH = 30;
-  const fpsBtnX = cx - fpsBtnW / 2;
-  const fpsBtnY = cy + 154;
+  const fpsBtnX = panelX + padding;
+  const fpsBtnY = footerDividerY + 10;
   fpsBtnBounds.x = fpsBtnX;
   fpsBtnBounds.y = fpsBtnY;
   fpsBtnBounds.w = fpsBtnW;
   fpsBtnBounds.h = fpsBtnH;
 
-  ctx.fillStyle = '#111133';
-  ctx.strokeStyle = '#4444aa';
-  ctx.lineWidth = 1;
+  ctx.fillStyle = 'rgba(5,5,15,0.9)';
   ctx.fillRect(fpsBtnX, fpsBtnY, fpsBtnW, fpsBtnH);
+  ctx.strokeStyle = '#22ddff';
+  ctx.lineWidth = 2;
   ctx.strokeRect(fpsBtnX, fpsBtnY, fpsBtnW, fpsBtnH);
 
-  ctx.font = `7px ${PX_FONT}`;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#aaaacc';
-  ctx.fillText('FPS COUNTER', cx, fpsBtnY + 12);
+  const fpsMidY = fpsBtnY + fpsBtnH / 2 + 4;
+  ctx.font = `9px ${PX_FONT}`;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#8899bb';
+  ctx.fillText('FPS COUNTER', fpsBtnX + 10, fpsMidY);
 
   const fpsStatus = showFps ? 'ON' : 'OFF';
-  ctx.fillStyle = showFps ? '#44ff88' : '#ff6644';
-  ctx.fillText(fpsStatus, cx, fpsBtnY + 24);
+  ctx.fillStyle = showFps ? '#44ff88' : '#ff4444';
+  ctx.font = `10px ${PX_FONT}`;
+  ctx.textAlign = 'right';
+  ctx.fillText(fpsStatus, fpsBtnX + fpsBtnW - 10, fpsMidY);
 
   ctx.textAlign = 'left';
 }
