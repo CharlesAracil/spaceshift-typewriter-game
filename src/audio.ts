@@ -1,9 +1,14 @@
-const MUTED_KEY = 'audio_muted';
-const VOLUME_KEY = 'audio_volume';
+const MUSIC_MUTED_KEY  = 'audio_music_muted';
+const MUSIC_VOLUME_KEY = 'audio_music_volume';
+const SFX_MUTED_KEY    = 'audio_sfx_muted';
+const SFX_VOLUME_KEY   = 'audio_sfx_volume';
+// Legacy keys — read once for migration, never written
+const LEGACY_MUTED_KEY  = 'audio_muted';
+const LEGACY_VOLUME_KEY = 'audio_volume';
 
 export class AudioManager {
   private _ctx: AudioContext | null = null;
-  private _masterGain: GainNode | null = null;
+  private _sfxBusGain: GainNode | null = null;
   private _musicGain: GainNode | null = null;
   private _droneOsc1: OscillatorNode | null = null;
   private _droneOsc2: OscillatorNode | null = null;
@@ -15,44 +20,73 @@ export class AudioManager {
   private _arpInterval: ReturnType<typeof setInterval> | null = null;
   private _arpStopped = false;
   private _musicPlaying = false;
-  private _muted: boolean;
-  private _volume: number;
+  private _musicMuted: boolean;
+  private _musicVolume: number;
+  private _sfxMuted: boolean;
+  private _sfxVolume: number;
 
   constructor() {
-    const storedMuted = localStorage.getItem(MUTED_KEY);
-    this._muted = storedMuted === 'true';
+    const legacyMuted = localStorage.getItem(LEGACY_MUTED_KEY) === 'true';
+    const legacyVolRaw = parseFloat(localStorage.getItem(LEGACY_VOLUME_KEY) ?? '');
+    const legacyVol = Number.isNaN(legacyVolRaw) ? 0.5 : Math.max(0, Math.min(1, legacyVolRaw));
 
-    const storedVolume = localStorage.getItem(VOLUME_KEY);
-    const parsed = parseFloat(storedVolume ?? '');
-    this._volume = Number.isNaN(parsed) ? 0.5 : Math.max(0, Math.min(1, parsed));
+    // Music muted
+    const storedMusicMuted = localStorage.getItem(MUSIC_MUTED_KEY);
+    this._musicMuted = storedMusicMuted !== null ? storedMusicMuted === 'true' : legacyMuted;
+
+    // Music volume
+    const storedMusicVol = localStorage.getItem(MUSIC_VOLUME_KEY);
+    const parsedMusicVol = parseFloat(storedMusicVol ?? '');
+    this._musicVolume = !Number.isNaN(parsedMusicVol)
+      ? Math.max(0, Math.min(1, parsedMusicVol))
+      : legacyVol;
+
+    // SFX muted
+    const storedSfxMuted = localStorage.getItem(SFX_MUTED_KEY);
+    this._sfxMuted = storedSfxMuted !== null ? storedSfxMuted === 'true' : legacyMuted;
+
+    // SFX volume
+    const storedSfxVol = localStorage.getItem(SFX_VOLUME_KEY);
+    const parsedSfxVol = parseFloat(storedSfxVol ?? '');
+    this._sfxVolume = !Number.isNaN(parsedSfxVol)
+      ? Math.max(0, Math.min(1, parsedSfxVol))
+      : legacyVol;
   }
 
-  get muted(): boolean {
-    return this._muted;
+  get musicMuted(): boolean { return this._musicMuted; }
+  set musicMuted(value: boolean) {
+    this._musicMuted = value;
+    localStorage.setItem(MUSIC_MUTED_KEY, String(value));
+    this._applyMusicGain();
   }
 
-  set muted(value: boolean) {
-    this._muted = value;
-    localStorage.setItem(MUTED_KEY, String(value));
-    this._applyGain();
+  get musicVolume(): number { return this._musicVolume; }
+  set musicVolume(value: number) {
+    this._musicVolume = Math.max(0, Math.min(1, value));
+    localStorage.setItem(MUSIC_VOLUME_KEY, String(this._musicVolume));
+    this._applyMusicGain();
   }
 
-  get volume(): number {
-    return this._volume;
+  get sfxMuted(): boolean { return this._sfxMuted; }
+  set sfxMuted(value: boolean) {
+    this._sfxMuted = value;
+    localStorage.setItem(SFX_MUTED_KEY, String(value));
+    this._applySfxGain();
   }
 
-  set volume(value: number) {
-    this._volume = Math.max(0, Math.min(1, value));
-    localStorage.setItem(VOLUME_KEY, String(this._volume));
-    this._applyGain();
+  get sfxVolume(): number { return this._sfxVolume; }
+  set sfxVolume(value: number) {
+    this._sfxVolume = Math.max(0, Math.min(1, value));
+    localStorage.setItem(SFX_VOLUME_KEY, String(this._sfxVolume));
+    this._applySfxGain();
   }
 
   playTyping(): void {
-    const { ctx, master } = this._ensureCtx();
+    const { ctx, sfxBus } = this._ensureCtx();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
-    gain.connect(master);
+    gain.connect(sfxBus);
     osc.type = 'square';
     osc.frequency.value = 800 + Math.random() * 400;
     gain.gain.setValueAtTime(0.3, ctx.currentTime);
@@ -62,11 +96,11 @@ export class AudioManager {
   }
 
   playKill(): void {
-    const { ctx, master } = this._ensureCtx();
+    const { ctx, sfxBus } = this._ensureCtx();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
-    gain.connect(master);
+    gain.connect(sfxBus);
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(1200, ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.18);
@@ -77,7 +111,7 @@ export class AudioManager {
   }
 
   playExplosion(): void {
-    const { ctx, master } = this._ensureCtx();
+    const { ctx, sfxBus } = this._ensureCtx();
     const bufferSize = Math.ceil(ctx.sampleRate * 0.38);
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -90,21 +124,21 @@ export class AudioManager {
     gain.gain.setValueAtTime(0.6, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
     source.connect(gain);
-    gain.connect(master);
+    gain.connect(sfxBus);
     source.start();
     source.stop(ctx.currentTime + 0.38);
   }
 
   // Total duration: 3 * 0.10 + 0.15 = 0.45 s (≤600 ms AC)
   playGameStart(): void {
-    const { ctx, master } = this._ensureCtx();
+    const { ctx, sfxBus } = this._ensureCtx();
     const notes = [440, 554, 659, 880];
     for (let i = 0; i < notes.length; i++) {
       const freq = notes[i] as number;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
-      gain.connect(master);
+      gain.connect(sfxBus);
       osc.type = 'sine';
       osc.frequency.value = freq;
       const t = ctx.currentTime + i * 0.10;
@@ -118,14 +152,14 @@ export class AudioManager {
 
   // Total duration: 3 * 0.15 + 0.30 = 0.75 s (≤800 ms AC)
   playGameOver(): void {
-    const { ctx, master } = this._ensureCtx();
+    const { ctx, sfxBus } = this._ensureCtx();
     const notes = [440, 370, 311, 220];
     for (let i = 0; i < notes.length; i++) {
       const freq = notes[i] as number;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
-      gain.connect(master);
+      gain.connect(sfxBus);
       osc.type = 'sine';
       osc.frequency.value = freq;
       const t = ctx.currentTime + i * 0.15;
@@ -147,12 +181,12 @@ export class AudioManager {
       this._stopMusicNodes();
     }
 
-    const { ctx, master } = this._ensureCtx();
+    const { ctx } = this._ensureCtx();
 
     // Fresh gain node for this music session
     const musicGain = ctx.createGain();
     musicGain.gain.value = 0;
-    musicGain.connect(master);
+    musicGain.connect(ctx.destination);
     this._musicGain = musicGain;
 
     // ---- Bass pulse (triangle, A2 = 110 Hz) ----
@@ -258,10 +292,11 @@ export class AudioManager {
     this._padOsc3.start();
     this._tremoloOsc.start();
 
-    // Fade in over 2 seconds
+    // Fade in over 2 seconds (respecting music volume and mute state)
     const now = ctx.currentTime;
+    const targetGain = this._musicMuted ? 0 : this._musicVolume * 0.18;
     musicGain.gain.setValueAtTime(0, now);
-    musicGain.gain.linearRampToValueAtTime(0.18, now + 2);
+    musicGain.gain.linearRampToValueAtTime(targetGain, now + 2);
 
     this._musicPlaying = true;
   }
@@ -330,19 +365,31 @@ export class AudioManager {
     }, 2500);
   }
 
-  private _ensureCtx(): { ctx: AudioContext; master: GainNode } {
+  private _ensureCtx(): { ctx: AudioContext; sfxBus: GainNode } {
     if (!this._ctx) {
       this._ctx = new AudioContext();
-      this._masterGain = this._ctx.createGain();
-      this._masterGain.connect(this._ctx.destination);
-      this._masterGain.gain.value = this._muted ? 0 : this._volume;
+      this._sfxBusGain = this._ctx.createGain();
+      this._sfxBusGain.gain.value = this._sfxMuted ? 0 : this._sfxVolume;
+      this._sfxBusGain.connect(this._ctx.destination);
     }
-    return { ctx: this._ctx, master: this._masterGain as GainNode };
+    return { ctx: this._ctx, sfxBus: this._sfxBusGain as GainNode };
   }
 
-  private _applyGain(): void {
-    if (this._masterGain) {
-      this._masterGain.gain.value = this._muted ? 0 : this._volume;
+  private _applyMusicGain(): void {
+    if (this._musicGain && this._ctx) {
+      const now = this._ctx.currentTime;
+      this._musicGain.gain.cancelScheduledValues(now);
+      this._musicGain.gain.setTargetAtTime(
+        this._musicMuted ? 0 : this._musicVolume * 0.18,
+        now,
+        0.05
+      );
+    }
+  }
+
+  private _applySfxGain(): void {
+    if (this._sfxBusGain) {
+      this._sfxBusGain.gain.value = this._sfxMuted ? 0 : this._sfxVolume;
     }
   }
 }
