@@ -3,6 +3,9 @@ import { Explosion } from './explosion.ts';
 import { LaserBeam } from './laser.ts';
 import { Rocket } from './rocket.ts';
 import { getWordForSize, type WordTier } from './words.ts';
+import { AudioManager } from './audio.ts';
+
+const audio = new AudioManager();
 
 // Pixel-art font used throughout
 const PX_FONT = '"Press Start 2P", monospace';
@@ -187,6 +190,8 @@ function handleKeyDown(e: KeyboardEvent): void {
   if (gameState === 'start') {
     if (e.key === 'Enter') {
       gameState = 'playing';
+      audio.playGameStart();
+      audio.startMusic();
     }
     return;
   }
@@ -194,6 +199,7 @@ function handleKeyDown(e: KeyboardEvent): void {
   if (gameState === 'paused') {
     if (e.key === 'Escape') {
       gameState = 'playing';
+      audio.resumeMusic();
     }
     return;
   }
@@ -201,6 +207,7 @@ function handleKeyDown(e: KeyboardEvent): void {
   if (gameState === 'playing') {
     if (e.key === 'Escape') {
       gameState = 'paused';
+      audio.pauseMusic();
       return;
     }
 
@@ -233,12 +240,15 @@ function handleKeyDown(e: KeyboardEvent): void {
 
     typedBuffer = newBuffer;
     updateTarget();
+    audio.playTyping();
 
     // Check if the typed buffer completes the targeted rocket's word
     if (targetedRocket !== null && targetedRocket.word === typedBuffer) {
       score += targetedRocket.word.length * POINTS_PER_CHAR;
       lasers.push(new LaserBeam(canvas.width / 2, canvas.height / 2, targetedRocket.x, targetedRocket.y));
       explosions.push(new Explosion(targetedRocket.x, targetedRocket.y));
+      audio.playKill();
+      audio.playExplosion();
       targetedRocket.destroy();
       const idx = rockets.indexOf(targetedRocket);
       if (idx !== -1) rockets.splice(idx, 1);
@@ -274,6 +284,8 @@ function triggerGameOver(): void {
   finalTimeSec = gameElapsedSec;
   playerName = '';
   gameState = 'entering-name';
+  audio.playGameOver();
+  audio.stopMusic();
 }
 
 function submitName(): void {
@@ -304,11 +316,30 @@ function resetGame(): void {
 // Play Again button bounds (updated each frame during drawLeaderboard)
 let playAgainBtn = { x: 0, y: 0, w: 0, h: 0 };
 
+// Pause overlay control bounds (updated each frame during drawPauseOverlay)
+let muteBtn = { x: 0, y: 0, w: 0, h: 0 };
+let volumeSlider = { x: 0, y: 0, w: 0, h: 0 };
+let isDraggingVolume = false;
+
 canvas.addEventListener('click', (e: MouseEvent) => {
-  if (gameState !== 'leaderboard') return;
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
+
+  if (gameState === 'paused') {
+    if (
+      !isDraggingVolume &&
+      mx >= muteBtn.x &&
+      mx <= muteBtn.x + muteBtn.w &&
+      my >= muteBtn.y &&
+      my <= muteBtn.y + muteBtn.h
+    ) {
+      audio.muted = !audio.muted;
+    }
+    return;
+  }
+
+  if (gameState !== 'leaderboard') return;
   if (
     mx >= playAgainBtn.x &&
     mx <= playAgainBtn.x + playAgainBtn.w &&
@@ -317,6 +348,40 @@ canvas.addEventListener('click', (e: MouseEvent) => {
   ) {
     resetGame();
   }
+});
+
+// ---- Volume slider drag ----
+
+function applyVolumeFromMouseX(mx: number): void {
+  const t = Math.max(0, Math.min(1, (mx - volumeSlider.x) / volumeSlider.w));
+  audio.volume = t;
+}
+
+canvas.addEventListener('mousedown', (e: MouseEvent) => {
+  if (gameState !== 'paused') return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  if (
+    mx >= volumeSlider.x &&
+    mx <= volumeSlider.x + volumeSlider.w &&
+    my >= volumeSlider.y &&
+    my <= volumeSlider.y + volumeSlider.h
+  ) {
+    isDraggingVolume = true;
+    applyVolumeFromMouseX(mx);
+  }
+});
+
+window.addEventListener('mousemove', (e: MouseEvent) => {
+  if (!isDraggingVolume) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  applyVolumeFromMouseX(mx);
+});
+
+window.addEventListener('mouseup', () => {
+  isDraggingVolume = false;
 });
 
 // ---- Spawning ----
@@ -396,6 +461,7 @@ function update(delta: number): void {
     const r = rockets[i];
     if (r.hasReachedBase(canvas)) {
       base.takeDamage(ROCKET_DAMAGE);
+      audio.playExplosion();
       r.destroy();
       rockets.splice(i, 1);
       if (base.hp <= 0) {
@@ -739,6 +805,55 @@ function drawPauseOverlay(): void {
   ctx.fillStyle = '#aaaacc';
   ctx.font = `10px ${PX_FONT}`;
   ctx.fillText('[ ESC to resume ]', cx, cy + 20);
+
+  // Mute toggle button
+  const btnW = 200;
+  const btnH = 36;
+  const btnX = cx - btnW / 2;
+  const btnY = cy + 48;
+  muteBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
+
+  ctx.fillStyle = 'rgba(5,5,15,0.9)';
+  ctx.fillRect(btnX, btnY, btnW, btnH);
+  ctx.strokeStyle = '#22ddff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+  ctx.fillStyle = audio.muted ? '#ff4444' : '#44ff88';
+  ctx.font = `10px ${PX_FONT}`;
+  ctx.fillText(audio.muted ? 'SOUND: OFF' : 'SOUND: ON', cx, btnY + 24);
+
+  // Volume label
+  ctx.fillStyle = '#8888bb';
+  ctx.font = `8px ${PX_FONT}`;
+  ctx.fillText('VOLUME', cx, cy + 102);
+
+  // Volume slider track
+  const sliderW = 240;
+  const sliderH = 16;
+  const sliderX = cx - sliderW / 2;
+  const sliderY = cy + 112;
+  volumeSlider = { x: sliderX, y: sliderY, w: sliderW, h: sliderH };
+
+  ctx.fillStyle = 'rgba(5,5,15,0.9)';
+  ctx.fillRect(sliderX, sliderY, sliderW, sliderH);
+  ctx.strokeStyle = '#22ddff';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(sliderX, sliderY, sliderW, sliderH);
+
+  // Volume fill
+  const fillW = sliderW * audio.volume;
+  ctx.fillStyle = audio.muted ? '#334455' : '#22ddff';
+  ctx.fillRect(sliderX, sliderY, fillW, sliderH);
+
+  // Thumb indicator
+  const thumbX = sliderX + fillW;
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(thumbX, sliderY - 3);
+  ctx.lineTo(thumbX, sliderY + sliderH + 3);
+  ctx.stroke();
 
   ctx.textAlign = 'left';
 }
