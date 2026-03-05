@@ -130,6 +130,10 @@ const SPEED_TAU   = 90;   // seconds — time constant for exponential growth
 const LEVEL_STEP_SEC = 30;
 const MAX_LEVEL      = 10;
 
+// Word tier thresholds (seconds) — adjusted for the extended 5–8 min session
+const TIER_SHORT_MAX_SEC  = 90;   // short → medium transition
+const TIER_MEDIUM_MAX_SEC = 180;  // medium → long transition
+
 interface DifficultyParams {
   spawnIntervalMs: number;
   rocketSpeed: number;
@@ -146,9 +150,9 @@ function getDifficulty(): DifficultyParams {
   // Rocket speed: continuous exponential rise from 70 px/s → 160 px/s over 5+ min
   const rocketSpeed = SPEED_MAX - SPEED_RANGE * Math.exp(-t / SPEED_TAU);
 
-  // Word tier: short < 60s, medium 60–120s, long ≥ 120s
+  // Word tier: short < 90s, medium 90–180s, long ≥ 180s
   const wordTier: WordTier =
-    t < 60 ? 'short' : t < 120 ? 'medium' : 'long';
+    t < TIER_SHORT_MAX_SEC ? 'short' : t < TIER_MEDIUM_MAX_SEC ? 'medium' : 'long';
 
   // Display level 1–10 derived from elapsed time (one level per 30 s)
   const level = Math.min(MAX_LEVEL, Math.floor(t / LEVEL_STEP_SEC) + 1);
