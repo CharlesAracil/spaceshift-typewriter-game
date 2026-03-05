@@ -115,6 +115,21 @@ function formatTime(sec: number): string {
 
 // ---- Difficulty ----
 
+// Exponential difficulty curve constants — tweak these to tune game feel.
+// Spawn interval: SPAWN_INITIAL * e^(-t / SPAWN_TAU) + SPAWN_MIN
+const SPAWN_INITIAL = 1800;  // ms added on top of floor at t=0 (initial = 1800+600 = 2400ms)
+const SPAWN_MIN     = 600;   // ms floor — fastest spawn rate, reached ~5 min
+const SPAWN_TAU     = 90;    // seconds — time constant for exponential decay
+
+// Rocket speed: SPEED_MAX - SPEED_RANGE * e^(-t / SPEED_TAU)
+const SPEED_MAX   = 160;  // px/s ceiling
+const SPEED_RANGE = 90;   // px/s range (initial speed = SPEED_MAX - SPEED_RANGE = 70)
+const SPEED_TAU   = 90;   // seconds — time constant for exponential growth
+
+// Level display: integer 1–MAX_LEVEL, one level per 30 seconds, plateau at 5 min
+const LEVEL_STEP_SEC = 30;
+const MAX_LEVEL      = 10;
+
 interface DifficultyParams {
   spawnIntervalMs: number;
   rocketSpeed: number;
@@ -123,21 +138,20 @@ interface DifficultyParams {
 }
 
 function getDifficulty(): DifficultyParams {
-  // Step increases every 30 seconds (0, 1, 2, …)
-  const step = Math.floor(gameElapsedSec / 30);
+  const t = gameElapsedSec;
 
-  // Spawn interval: 4000ms → 750ms, decreasing 650ms per step, capped at 750ms
-  const spawnIntervalMs = Math.max(750, 4000 - step * 650);
+  // Spawn interval: continuous exponential decay from ~2400ms → ~600ms over 5+ min
+  const spawnIntervalMs = SPAWN_INITIAL * Math.exp(-t / SPAWN_TAU) + SPAWN_MIN;
 
-  // Rocket speed: 70 → 145 px/s (+15 per step), capped at 150
-  const rocketSpeed = Math.min(150, 70 + step * 15);
+  // Rocket speed: continuous exponential rise from 70 px/s → 160 px/s over 5+ min
+  const rocketSpeed = SPEED_MAX - SPEED_RANGE * Math.exp(-t / SPEED_TAU);
 
   // Word tier: short < 60s, medium 60–120s, long ≥ 120s
   const wordTier: WordTier =
-    gameElapsedSec < 60 ? 'short' : gameElapsedSec < 120 ? 'medium' : 'long';
+    t < 60 ? 'short' : t < 120 ? 'medium' : 'long';
 
-  // Display level 1–6 (mirrors the 6 difficulty steps 0–5)
-  const level = Math.min(6, step + 1);
+  // Display level 1–10 derived from elapsed time (one level per 30 s)
+  const level = Math.min(MAX_LEVEL, Math.floor(t / LEVEL_STEP_SEC) + 1);
 
   return { spawnIntervalMs, rocketSpeed, wordTier, level };
 }
@@ -317,10 +331,10 @@ function resetGame(): void {
 let playAgainBtn = { x: 0, y: 0, w: 0, h: 0 };
 
 // Pause overlay control bounds (updated each frame during drawPauseOverlay)
-let musicMuteBtn = { x: 0, y: 0, w: 0, h: 0 };
-let musicSlider  = { x: 0, y: 0, w: 0, h: 0 };
-let sfxMuteBtn   = { x: 0, y: 0, w: 0, h: 0 };
-let sfxSlider    = { x: 0, y: 0, w: 0, h: 0 };
+const musicMuteBtn = { x: 0, y: 0, w: 0, h: 0 };
+const musicSlider  = { x: 0, y: 0, w: 0, h: 0 };
+const sfxMuteBtn   = { x: 0, y: 0, w: 0, h: 0 };
+const sfxSlider    = { x: 0, y: 0, w: 0, h: 0 };
 let activeSlider: 'music' | 'sfx' | null = null;
 
 // FPS counter
@@ -329,7 +343,7 @@ let showFps: boolean = localStorage.getItem(FPS_STORAGE_KEY) === 'true';
 let fpsDisplay = 0;
 let fpsSampleTime = 0;
 let fpsFrameCount = 0;
-let fpsBtnBounds = { x: 0, y: 0, w: 0, h: 0 };
+const fpsBtnBounds = { x: 0, y: 0, w: 0, h: 0 };
 
 canvas.addEventListener('click', (e: MouseEvent) => {
   const rect = canvas.getBoundingClientRect();
