@@ -833,6 +833,139 @@ function drawLeaderboard(): void {
   ctx.textAlign = 'left';
 }
 
+function drawHeartIcon(cx: number, cy: number, size: number, color: string): void {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  const s = size / 2;
+  ctx.moveTo(cx, cy + s * 0.8);
+  ctx.bezierCurveTo(cx - s * 1.2, cy, cx - s * 1.2, cy - s * 0.9, cx, cy - s * 0.25);
+  ctx.bezierCurveTo(cx + s * 1.2, cy - s * 0.9, cx + s * 1.2, cy, cx, cy + s * 0.8);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSnowflakeIcon(cx: number, cy: number, size: number, color: string): void {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  const r = size / 2;
+  for (let i = 0; i < 3; i++) {
+    const angle = (i * Math.PI) / 3;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+    ctx.lineTo(cx - Math.cos(angle) * r, cy - Math.sin(angle) * r);
+    ctx.stroke();
+  }
+  const branchR = r * 0.55;
+  const branchLen = r * 0.28;
+  for (let i = 0; i < 6; i++) {
+    const angle = (i * Math.PI) / 3;
+    const bx = cx + Math.cos(angle) * branchR;
+    const by = cy + Math.sin(angle) * branchR;
+    const perpAngle = angle + Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(bx + Math.cos(perpAngle) * branchLen, by + Math.sin(perpAngle) * branchLen);
+    ctx.lineTo(bx - Math.cos(perpAngle) * branchLen, by - Math.sin(perpAngle) * branchLen);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawSpellHUD(): void {
+  const rowH = 28;
+  const panelW = 190;
+  const panelH = rowH * 2 + 16;
+  const panelX = 16;
+  // Position just above the typing HUD (panelH=60, marginBottom=16, gap=8)
+  const panelY = canvas.height - 60 - 16 - panelH - 8;
+  const radius = 6;
+
+  ctx.save();
+  ctx.globalAlpha = 1;
+
+  // Dark semi-transparent background
+  ctx.fillStyle = 'rgba(2,10,20,0.88)';
+  ctx.beginPath();
+  ctx.roundRect(panelX, panelY, panelW, panelH, radius);
+  ctx.fill();
+
+  // Cyan border
+  ctx.strokeStyle = '#22ddff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(panelX, panelY, panelW, panelH, radius);
+  ctx.stroke();
+
+  // 'SPELLS' label
+  ctx.fillStyle = '#22ddff';
+  ctx.globalAlpha = 0.65;
+  ctx.font = `6px ${PX_FONT}`;
+  ctx.textAlign = 'left';
+  ctx.fillText('SPELLS', panelX + 4, panelY - 4);
+  ctx.globalAlpha = 1;
+
+  const spells = [
+    { name: 'heal',   ratio: spellManager.healCooldownRatio,   ready: spellManager.healReady,   color: '#44ff88', dimColor: '#225533' },
+    { name: 'freeze', ratio: spellManager.freezeCooldownRatio, ready: spellManager.freezeReady, color: '#44aaff', dimColor: '#223355' },
+  ];
+
+  const iconSize = 10;
+  const iconCX = panelX + 14;
+  const wordX = iconCX + iconSize / 2 + 6;
+  const barW = 72;
+  const barH = 5;
+  const barX = panelX + panelW - barW - 10;
+
+  for (let i = 0; i < spells.length; i++) {
+    const spell = spells[i];
+    const rowCY = panelY + 8 + i * rowH + rowH / 2;
+
+    // Icon
+    if (spell.name === 'heal') {
+      ctx.globalAlpha = spell.ready ? 1 : 0.45;
+      drawHeartIcon(iconCX, rowCY, iconSize, spell.color);
+    } else {
+      ctx.globalAlpha = spell.ready ? 1 : 0.45;
+      drawSnowflakeIcon(iconCX, rowCY, iconSize, spell.color);
+    }
+    ctx.globalAlpha = 1;
+
+    // Word text
+    ctx.font = `7px ${PX_FONT}`;
+    ctx.textAlign = 'left';
+    if (spell.ready) {
+      const blink = Math.floor(Date.now() / 600) % 2 === 0;
+      ctx.globalAlpha = blink ? 1.0 : 0.7;
+      ctx.fillStyle = spell.color;
+    } else {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#556677';
+    }
+    ctx.fillText(spell.name.toUpperCase(), wordX, rowCY + 3);
+    ctx.globalAlpha = 1;
+
+    // Cooldown bar background
+    const barY = rowCY - barH / 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.strokeStyle = '#223344';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
+
+    // Cooldown bar fill (left to right as ratio goes 0→1)
+    const fillW = Math.round(barW * spell.ratio);
+    if (fillW > 0) {
+      ctx.fillStyle = spell.ready ? spell.color : spell.dimColor;
+      ctx.fillRect(barX, barY, fillW, barH);
+    }
+  }
+
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
 function drawTypingHUD(): void {
   const panelW = Math.min(500, canvas.width * 0.6);
   const panelH = 60;
@@ -1196,6 +1329,11 @@ function render(): void {
     ctx.textAlign = 'right';
     ctx.fillText(fpsText, canvas.width - 8 - fpsPadX, fpsBgY + fpsBgH - fpsPadY);
     ctx.textAlign = 'left';
+  }
+
+  // Spell HUD — only during active play (not paused)
+  if (gameState === 'playing') {
+    drawSpellHUD();
   }
 
   // Typing HUD drawn last so it's always on top
