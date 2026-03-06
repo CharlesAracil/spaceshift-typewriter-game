@@ -1,10 +1,10 @@
 import { Base } from './base.ts';
-import { Explosion, HealBurst } from './explosion.ts';
+import { Explosion, HealBurst, FreezeBurst } from './explosion.ts';
 import { LaserBeam } from './laser.ts';
 import { Rocket } from './rocket.ts';
 import { getWordForSize, type WordTier } from './words.ts';
 import { AudioManager } from './audio.ts';
-import { SpellManager, SPELL_WORDS, HEAL_AMOUNT } from './spells.ts';
+import { SpellManager, SPELL_WORDS, HEAL_AMOUNT, FREEZE_DURATION_MS } from './spells.ts';
 
 const audio = new AudioManager();
 const spellManager = new SpellManager();
@@ -57,6 +57,7 @@ const rockets: Rocket[] = [];
 const lasers: LaserBeam[] = [];
 const explosions: Explosion[] = [];
 const healBursts: HealBurst[] = [];
+const freezeBursts: FreezeBurst[] = [];
 
 interface FloatingText {
   x: number;
@@ -70,6 +71,9 @@ interface FloatingText {
 const floatingTexts: FloatingText[] = [];
 
 const ROCKET_DAMAGE = 10; // HP lost per rocket impact
+
+let screenFlashTimer = 0;
+let screenFlashColor = '#ffffff';
 
 let spawnTimer = 0;
 let typedBuffer = '';
@@ -294,7 +298,14 @@ function handleKeyDown(e: KeyboardEvent): void {
       return;
     }
     if (typedBuffer === 'freeze') {
-      spellManager.triggerFreeze();
+      if (spellManager.triggerFreeze()) {
+        for (const rocket of rockets) {
+          rocket.freeze(FREEZE_DURATION_MS);
+        }
+        screenFlashTimer = 400;
+        screenFlashColor = '#ffffff';
+        freezeBursts.push(new FreezeBurst(canvas.width / 2, canvas.height / 2));
+      }
       typedBuffer = '';
       updateTarget();
       return;
@@ -360,7 +371,9 @@ function resetGame(): void {
   lasers.length = 0;
   explosions.length = 0;
   healBursts.length = 0;
+  freezeBursts.length = 0;
   floatingTexts.length = 0;
+  screenFlashTimer = 0;
   base.reset();
   spellManager.reset();
   spawnTimer = 0;
@@ -582,6 +595,19 @@ function update(delta: number): void {
   }
   for (let i = healBursts.length - 1; i >= 0; i--) {
     if (healBursts[i].isDone()) healBursts.splice(i, 1);
+  }
+
+  // Update freeze bursts
+  for (const fb of freezeBursts) {
+    fb.update(delta);
+  }
+  for (let i = freezeBursts.length - 1; i >= 0; i--) {
+    if (freezeBursts[i].isDone()) freezeBursts.splice(i, 1);
+  }
+
+  // Update screen flash
+  if (screenFlashTimer > 0) {
+    screenFlashTimer = Math.max(0, screenFlashTimer - delta);
   }
 
   // Update floating texts
@@ -1097,6 +1123,14 @@ function render(): void {
   ctx.globalAlpha = 1;
   drawBackground();
 
+  // Screen flash (after background, before game entities)
+  if (screenFlashTimer > 0) {
+    ctx.globalAlpha = (screenFlashTimer / 400) * 0.5;
+    ctx.fillStyle = screenFlashColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 1;
+  }
+
   base.render(ctx, canvas);
 
   for (const laser of lasers) {
@@ -1113,6 +1147,10 @@ function render(): void {
 
   for (const hb of healBursts) {
     hb.render(ctx);
+  }
+
+  for (const fb of freezeBursts) {
+    fb.render(ctx);
   }
 
   // Floating texts

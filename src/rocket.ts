@@ -10,6 +10,8 @@ export class Rocket {
   destroyed: boolean = false;
   isTargeted: boolean = false;
   typedCount: number = 0;
+  frozen: boolean = false;
+  frozenTimer: number = 0;
 
   constructor(
     x: number,
@@ -32,8 +34,21 @@ export class Rocket {
   }
 
   update(delta: number): void {
+    if (this.frozen) {
+      this.frozenTimer -= delta;
+      if (this.frozenTimer <= 0) {
+        this.frozen = false;
+        this.frozenTimer = 0;
+      }
+      return;
+    }
     this.x += this.vx * (delta / 1000);
     this.y += this.vy * (delta / 1000);
+  }
+
+  freeze(duration: number): void {
+    this.frozen = true;
+    this.frozenTimer = duration;
   }
 
   hasReachedBase(canvas: HTMLCanvasElement): boolean {
@@ -65,6 +80,17 @@ export class Rocket {
       ctx.fillRect(-26, -14, 52, 28);
     }
     this.drawBody(ctx);
+    if (this.frozen) {
+      // Ice overlay on rocket body
+      ctx.fillStyle = 'rgba(100,200,255,0.45)';
+      ctx.fillRect(-26, -14, 52, 28);
+      // Ice crystals around the rocket
+      ctx.fillStyle = '#aaddff';
+      ctx.fillRect(-34, -8, 6, 6);
+      ctx.fillRect(30, -10, 5, 5);
+      ctx.fillRect(-10, -22, 4, 4);
+      ctx.fillRect(12, 18, 5, 4);
+    }
     ctx.restore();
 
     // Word label is always horizontal for readability
