@@ -1,3 +1,5 @@
+import { SPELL_WORDS } from './spells.ts';
+
 export type WordTier = 'short' | 'medium' | 'long';
 
 // Short words: 3–4 characters
@@ -342,7 +344,7 @@ const activeWords = new Set<string>();
  */
 export function getWord(tier: WordTier): string {
   const pool = WORD_TIERS[tier];
-  const available = pool.filter((w) => !activeWords.has(w));
+  const available = pool.filter((w) => !activeWords.has(w) && !SPELL_WORDS.includes(w));
   if (available.length === 0) {
     throw new Error(`No available words in tier "${tier}"`);
   }
@@ -359,7 +361,7 @@ export function getWord(tier: WordTier): string {
  */
 export function getWordForSize(size: 'small' | 'large'): string {
   const pool = size === 'small' ? SMALL_WORD_POOL : LARGE_WORD_POOL;
-  const available = pool.filter(w => !activeWords.has(w));
+  const available = pool.filter(w => !activeWords.has(w) && !SPELL_WORDS.includes(w));
   if (available.length === 0) {
     throw new Error(`No available words for size "${size}"`);
   }

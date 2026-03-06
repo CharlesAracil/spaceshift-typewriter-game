@@ -4,8 +4,10 @@ import { LaserBeam } from './laser.ts';
 import { Rocket } from './rocket.ts';
 import { getWordForSize, type WordTier } from './words.ts';
 import { AudioManager } from './audio.ts';
+import { SpellManager, SPELL_WORDS } from './spells.ts';
 
 const audio = new AudioManager();
+const spellManager = new SpellManager();
 
 // Pixel-art font used throughout
 const PX_FONT = '"Press Start 2P", monospace';
@@ -249,8 +251,8 @@ function handleKeyDown(e: KeyboardEvent): void {
 
     const newBuffer = typedBuffer + e.key.toLowerCase();
 
-    // Reject the character if no rocket matches the new prefix
-    if (!rockets.some(r => r.word.startsWith(newBuffer))) {
+    // Reject the character if no rocket or spell word matches the new prefix
+    if (!rockets.some(r => r.word.startsWith(newBuffer)) && !SPELL_WORDS.some(w => w.startsWith(newBuffer))) {
       typedBuffer = '';
       updateTarget();
       return;
@@ -259,6 +261,20 @@ function handleKeyDown(e: KeyboardEvent): void {
     typedBuffer = newBuffer;
     updateTarget();
     audio.playTyping();
+
+    // Check for spell word completion
+    if (typedBuffer === 'heal') {
+      spellManager.triggerHeal();
+      typedBuffer = '';
+      updateTarget();
+      return;
+    }
+    if (typedBuffer === 'freeze') {
+      spellManager.triggerFreeze();
+      typedBuffer = '';
+      updateTarget();
+      return;
+    }
 
     // Check if the typed buffer completes the targeted rocket's word
     if (targetedRocket !== null && targetedRocket.word === typedBuffer) {
@@ -320,6 +336,7 @@ function resetGame(): void {
   lasers.length = 0;
   explosions.length = 0;
   base.reset();
+  spellManager.reset();
   spawnTimer = 0;
   typedBuffer = '';
   targetedRocket = null;
@@ -476,6 +493,7 @@ let lastTime = 0;
 function update(delta: number): void {
   if (gameState !== 'playing') return;
 
+  spellManager.update(delta);
   base.update(delta);
 
   // Advance elapsed time (in seconds)
