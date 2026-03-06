@@ -1,10 +1,10 @@
 import { Base } from './base.ts';
-import { Explosion } from './explosion.ts';
+import { Explosion, HealBurst } from './explosion.ts';
 import { LaserBeam } from './laser.ts';
 import { Rocket } from './rocket.ts';
 import { getWordForSize, type WordTier } from './words.ts';
 import { AudioManager } from './audio.ts';
-import { SpellManager, SPELL_WORDS } from './spells.ts';
+import { SpellManager, SPELL_WORDS, HEAL_AMOUNT } from './spells.ts';
 
 const audio = new AudioManager();
 const spellManager = new SpellManager();
@@ -56,6 +56,18 @@ const base = new Base();
 const rockets: Rocket[] = [];
 const lasers: LaserBeam[] = [];
 const explosions: Explosion[] = [];
+const healBursts: HealBurst[] = [];
+
+interface FloatingText {
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  life: number;
+  maxLife: number;
+}
+
+const floatingTexts: FloatingText[] = [];
 
 const ROCKET_DAMAGE = 10; // HP lost per rocket impact
 
@@ -264,7 +276,19 @@ function handleKeyDown(e: KeyboardEvent): void {
 
     // Check for spell word completion
     if (typedBuffer === 'heal') {
-      spellManager.triggerHeal();
+      if (spellManager.triggerHeal()) {
+        base.heal(HEAL_AMOUNT);
+        healBursts.push(new HealBurst(canvas.width / 2, canvas.height / 2));
+        floatingTexts.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2 - 60,
+          text: `+${HEAL_AMOUNT}`,
+          color: '#44ff88',
+          life: 1200,
+          maxLife: 1200,
+        });
+        audio.playKill();
+      }
       typedBuffer = '';
       updateTarget();
       return;
@@ -335,6 +359,8 @@ function resetGame(): void {
   rockets.length = 0;
   lasers.length = 0;
   explosions.length = 0;
+  healBursts.length = 0;
+  floatingTexts.length = 0;
   base.reset();
   spellManager.reset();
   spawnTimer = 0;
@@ -548,6 +574,23 @@ function update(delta: number): void {
   }
   for (let i = explosions.length - 1; i >= 0; i--) {
     if (explosions[i].isDone()) explosions.splice(i, 1);
+  }
+
+  // Update heal bursts
+  for (const hb of healBursts) {
+    hb.update(delta);
+  }
+  for (let i = healBursts.length - 1; i >= 0; i--) {
+    if (healBursts[i].isDone()) healBursts.splice(i, 1);
+  }
+
+  // Update floating texts
+  for (const ft of floatingTexts) {
+    ft.y -= 40 * (delta / 1000);
+    ft.life -= delta;
+  }
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    if (floatingTexts[i].life <= 0) floatingTexts.splice(i, 1);
   }
 }
 
@@ -1067,6 +1110,24 @@ function render(): void {
   for (const exp of explosions) {
     exp.render(ctx);
   }
+
+  for (const hb of healBursts) {
+    hb.render(ctx);
+  }
+
+  // Floating texts
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = `12px ${PX_FONT}`;
+  for (const ft of floatingTexts) {
+    const alpha = ft.life / ft.maxLife;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = ft.color;
+    ctx.fillText(ft.text, ft.x, ft.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+  ctx.restore();
 
   drawHUD();
 

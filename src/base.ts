@@ -1,25 +1,36 @@
 export const BASE_MAX_HP = 100;
 
 const HIT_FLASH_DURATION_MS = 300;
+const HEAL_FLASH_DURATION_MS = 1200;
 
 export class Base {
   hp: number = BASE_MAX_HP;
   private hitFlashTimer: number = 0;
+  private healFlashTimer: number = 0;
 
   takeDamage(amount: number): void {
     this.hp = Math.max(0, this.hp - amount);
     this.hitFlashTimer = HIT_FLASH_DURATION_MS;
   }
 
+  heal(amount: number): void {
+    this.hp = Math.min(BASE_MAX_HP, this.hp + amount);
+    this.healFlashTimer = HEAL_FLASH_DURATION_MS;
+  }
+
   update(delta: number): void {
     if (this.hitFlashTimer > 0) {
       this.hitFlashTimer = Math.max(0, this.hitFlashTimer - delta);
+    }
+    if (this.healFlashTimer > 0) {
+      this.healFlashTimer = Math.max(0, this.healFlashTimer - delta);
     }
   }
 
   reset(): void {
     this.hp = BASE_MAX_HP;
     this.hitFlashTimer = 0;
+    this.healFlashTimer = 0;
   }
 
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
@@ -30,6 +41,34 @@ export class Base {
       this.drawBase(ctx, cx, cy);
     } else {
       this.drawDestroyedBase(ctx, cx, cy);
+    }
+
+    // Heal flash: green pulsing halo and expanding rings
+    if (this.healFlashTimer > 0) {
+      const ratio = this.healFlashTimer / HEAL_FLASH_DURATION_MS; // 1→0
+      const progress = 1 - ratio; // 0→1
+
+      // Pulsing halo arc
+      const haloAlpha = ratio * 0.7;
+      ctx.strokeStyle = `rgba(64,255,150,${haloAlpha.toFixed(2)})`;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 52, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 3 concentric expanding rings, staggered
+      for (let i = 0; i < 3; i++) {
+        const p = progress - i / 3;
+        if (p >= 0 && p < 1) {
+          const ringRadius = 46 + 74 * p;
+          const ringAlpha = (1 - p) * ratio * 0.9;
+          ctx.strokeStyle = `rgba(64,255,150,${ringAlpha.toFixed(2)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
     }
 
     // Hit flash: red circular overlay that fades out
