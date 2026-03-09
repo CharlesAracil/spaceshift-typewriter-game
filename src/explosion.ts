@@ -44,7 +44,12 @@ export class FreezeBurst {
       p.y += p.vy * (delta / 1000);
       p.life -= delta;
     }
-    this.particles = this.particles.filter(p => p.life > 0);
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      if (this.particles[i]!.life <= 0) {
+        this.particles[i] = this.particles[this.particles.length - 1]!;
+        this.particles.pop();
+      }
+    }
   }
 
   isDone(): boolean {
@@ -89,7 +94,12 @@ export class HealBurst {
       p.y += p.vy * (delta / 1000);
       p.life -= delta;
     }
-    this.particles = this.particles.filter(p => p.life > 0);
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      if (this.particles[i]!.life <= 0) {
+        this.particles[i] = this.particles[this.particles.length - 1]!;
+        this.particles.pop();
+      }
+    }
   }
 
   isDone(): boolean {
@@ -135,7 +145,12 @@ export class Explosion {
       p.life -= delta;
       p.vy += 40 * (delta / 1000); // gravity
     }
-    this.particles = this.particles.filter(p => p.life > 0);
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      if (this.particles[i]!.life <= 0) {
+        this.particles[i] = this.particles[this.particles.length - 1]!;
+        this.particles.pop();
+      }
+    }
   }
 
   isDone(): boolean {

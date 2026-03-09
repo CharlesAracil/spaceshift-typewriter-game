@@ -23,18 +23,12 @@ export class LaserBeam {
     return this.elapsed >= LASER_DURATION_MS;
   }
 
+  // Caller must set up shared state (save/restore, shadowBlur, strokeStyle, lineWidth)
   render(ctx: CanvasRenderingContext2D): void {
-    const alpha = Math.max(0, 1 - this.elapsed / LASER_DURATION_MS);
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.shadowBlur = 14;
-    ctx.shadowColor = '#aaffff';
-    ctx.strokeStyle = '#aaffff';
-    ctx.lineWidth = 2.5;
+    ctx.globalAlpha = Math.max(0, 1 - this.elapsed / LASER_DURATION_MS);
     ctx.beginPath();
     ctx.moveTo(this.x1, this.y1);
     ctx.lineTo(this.x2, this.y2);
     ctx.stroke();
-    ctx.restore();
   }
 }

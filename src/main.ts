@@ -159,7 +159,12 @@ interface DifficultyParams {
   level: number;
 }
 
+let _difficultyCache: { elapsed: number; params: DifficultyParams } | null = null;
+
 function getDifficulty(): DifficultyParams {
+  if (_difficultyCache !== null && _difficultyCache.elapsed === gameElapsedSec) {
+    return _difficultyCache.params;
+  }
   const t = gameElapsedSec;
 
   // Spawn interval: continuous exponential decay from ~2400ms → ~600ms over 5+ min
@@ -175,7 +180,9 @@ function getDifficulty(): DifficultyParams {
   // Display level 1–10 derived from elapsed time (one level per 30 s)
   const level = Math.min(MAX_LEVEL, Math.floor(t / LEVEL_STEP_SEC) + 1);
 
-  return { spawnIntervalMs, rocketSpeed, wordTier, level };
+  const params = { spawnIntervalMs, rocketSpeed, wordTier, level };
+  _difficultyCache = { elapsed: t, params };
+  return params;
 }
 
 // ---- Typing mechanics ----
@@ -1266,8 +1273,16 @@ function render(): void {
 
   base.render(ctx, canvas);
 
-  for (const laser of lasers) {
-    laser.render(ctx);
+  if (lasers.length > 0) {
+    ctx.save();
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = '#aaffff';
+    ctx.strokeStyle = '#aaffff';
+    ctx.lineWidth = 2.5;
+    for (const laser of lasers) {
+      laser.render(ctx);
+    }
+    ctx.restore();
   }
 
   for (const rocket of rockets) {

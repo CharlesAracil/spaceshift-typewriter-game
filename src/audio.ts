@@ -20,6 +20,8 @@ export class AudioManager {
   private _arpInterval: ReturnType<typeof setInterval> | null = null;
   private _arpStopped = false;
   private _musicPlaying = false;
+  private _activeTypingVoices = 0;
+  private static readonly MAX_TYPING_VOICES = 3;
   private _musicMuted: boolean;
   private _musicVolume: number;
   private _sfxMuted: boolean;
@@ -82,6 +84,7 @@ export class AudioManager {
   }
 
   playTyping(): void {
+    if (this._activeTypingVoices >= AudioManager.MAX_TYPING_VOICES) return;
     const { ctx, sfxBus } = this._ensureCtx();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -91,6 +94,8 @@ export class AudioManager {
     osc.frequency.value = 800 + Math.random() * 400;
     gain.gain.setValueAtTime(0.3, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.045);
+    this._activeTypingVoices++;
+    osc.onended = () => { this._activeTypingVoices--; };
     osc.start();
     osc.stop(ctx.currentTime + 0.045);
   }
