@@ -1,7 +1,7 @@
 export const HEAL_AMOUNT = 25;
-export const HEAL_COOLDOWN_MS = 60000;
+export const HEAL_COOLDOWN_MS = 30000;
 export const FREEZE_DURATION_MS = 5000;
-export const FREEZE_COOLDOWN_MS = 90000;
+export const FREEZE_COOLDOWN_MS = 30000;
 
 export const SPELL_WORDS: string[] = ['heal', 'freeze'];
 
